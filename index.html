@@ -1,0 +1,163 @@
+<!DOCTYPE html><html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerador de Imagens Gemini</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 {
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 500px;
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+    input[type="file"] {
+      margin-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #6200ee;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    img {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .dark-mode-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gerador de Imagens Gemini</h1>
+  <div class="container">
+    <label>API Key:</label>
+    <input type="text" id="apiKey" placeholder="Sua API Key aqui" /><label>Prompt:</label>
+<textarea id="prompt" rows="4" placeholder="Descreva a imagem..."></textarea>
+
+<label>Imagem de Referência (opcional):</label>
+<input type="file" id="imageInput" accept="image/*" />
+
+<label>Proporção:</label>
+<select id="ratio">
+  <option value="4K">4K (3840x2160)</option>
+  <option value="FullHD">Full HD (1920x1080)</option>
+  <option value="HD">HD (1280x720)</option>
+  <option value="16:9">16:9</option>
+  <option value="9:16">9:16</option>
+  <option value="Retrato">Retrato</option>
+</select>
+
+<button onclick="gerarImagem()">Gerar Imagem</button>
+<div id="status"></div>
+<img id="resultado" style="display:none;" />
+
+  </div>  <script type="module">
+    import { GoogleGenAI } from 'https://esm.run/@google/genai';
+
+    window.gerarImagem = async function () {
+      const apiKey = document.getElementById('apiKey').value;
+      const prompt = document.getElementById('prompt').value;
+      const imageInput = document.getElementById('imageInput');
+      const resultado = document.getElementById('resultado');
+      const status = document.getElementById('status');
+
+      if (!apiKey || !prompt) {
+        alert('Por favor, insira sua API Key e o prompt.');
+        return;
+      }
+
+      status.textContent = 'Gerando imagem...';
+      resultado.style.display = 'none';
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      let base64Image = null;
+      if (imageInput.files.length > 0) {
+        const file = imageInput.files[0];
+        base64Image = await toBase64(file);
+      }
+
+      const contents = base64Image ? [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: 'image/png',
+            data: base64Image.split(',')[1],
+          },
+        }
+      ] : [{ text: prompt }];
+
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.0-flash-exp-image-generation',
+          contents: contents,
+          config: {
+            responseModalities: ['Image', 'Text'],
+          },
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            resultado.src = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            resultado.style.display = 'block';
+            status.textContent = '';
+            break;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Erro ao gerar imagem';
+      }
+    };
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script></body>
+</html>
